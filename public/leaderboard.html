@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Leaderboard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <h2>Top Earners</h2>
+    <ul id="leaderboard"></ul>
+
+    <script>
+      fetch("/api/leaderboard")
+        .then((response) => response.json())
+        .then((data) => {
+          const leaderboard = document.getElementById("leaderboard");
+          data.forEach((user) => {
+            const li = document.createElement("li");
+            li.textContent = `${user.username} - $${user.earnings.toFixed(2)}`;
+            leaderboard.appendChild(li);
+          });
+        })
+        .catch((error) => console.error("Error loading leaderboard:", error));
+    </script>
+  </body>
+</html>

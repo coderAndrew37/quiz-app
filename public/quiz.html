@@ -3,27 +3,85 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EarnEase - Quiz</title>
+    <title>Take a Quiz</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <header>
-      <nav>
-        <a href="/">Home</a>
-        <a href="/login.html">Login</a>
-        <a href="/signup.html">Signup</a>
-        <a href="/quiz.html">Quizzes</a>
-      </nav>
-    </header>
+    <h2>Quiz</h2>
+    <div id="quiz-container"></div>
+    <div id="timer"></div>
+    <button id="next-question">Next Question</button>
 
-    <main>
-      <section id="quiz-container">
-        <h2>Take a Quiz</h2>
-        <!-- Quiz content dynamically populated via JavaScript -->
-        <div id="quiz-content"></div>
-      </section>
-    </main>
+    <script>
+      let currentQuestionIndex = 0;
+      let quizData = [];
+      let score = 0;
+      let timer;
+      const timerDisplay = document.getElementById("timer");
+      const nextButton = document.getElementById("next-question");
+      const quizContainer = document.getElementById("quiz-container");
 
-    <script src="scripts/main.js"></script>
+      function startTimer(duration) {
+        let time = duration;
+        timer = setInterval(() => {
+          time--;
+          timerDisplay.textContent = `Time left: ${time}s`;
+
+          if (time <= 0) {
+            clearInterval(timer);
+            alert("Time is up! Moving to next question...");
+            loadNextQuestion();
+          }
+        }, 1000);
+      }
+
+      function loadNextQuestion() {
+        if (currentQuestionIndex >= quizData.length) {
+          alert(`Quiz over! Your score: ${score}`);
+          submitResult();
+          return;
+        }
+
+        clearInterval(timer);
+        const question = quizData[currentQuestionIndex];
+        quizContainer.innerHTML = `
+                <h3>${question.questionText}</h3>
+                ${question.options
+                  .map(
+                    (option, index) =>
+                      `<button onclick="checkAnswer(${index}, ${question.correctAnswer})">${option}</button>`
+                  )
+                  .join("")}
+            `;
+        currentQuestionIndex++;
+        startTimer(10); // 10 seconds per question
+      }
+
+      function checkAnswer(selectedIndex, correctIndex) {
+        if (selectedIndex === correctIndex) {
+          score += 10; // Assume 10 points per correct answer
+        }
+        loadNextQuestion();
+      }
+
+      function submitResult() {
+        fetch("/submit-result", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ quizId: quizData._id, score }),
+        }).then(() => {
+          alert("Result submitted!");
+        });
+      }
+
+      fetch("/api/quizzes")
+        .then((res) => res.json())
+        .then((data) => {
+          quizData = data[0].questions; // Load first quiz for now
+          loadNextQuestion();
+        });
+
+      nextButton.addEventListener("click", loadNextQuestion);
+    </script>
   </body>
 </html>
