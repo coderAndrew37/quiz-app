@@ -2,7 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const bodyParser = require("body-parser");
-const session = require("express-session");
+const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 require("dotenv").config();
@@ -22,19 +22,28 @@ mongoose
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
-  .then(() => console.log("MongoDB connected"))
+  .then(() => console.log(`MongoDB connected at port ${PORT}`))
   .catch((err) => console.error(err));
 
 // Middleware
 app.use(express.static("public"));
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(
-  session({
-    secret: "secret_key",
-    resave: false,
-    saveUninitialized: true,
-  })
-);
+app.use(bodyParser.json()); // To handle JSON data in API requests
+
+// JWT secret
+const JWT_SECRET = process.env.JWT_SECRET || "your_secret_key";
+
+// Middleware to protect routes
+const authenticateToken = (req, res, next) => {
+  const token = req.headers["authorization"];
+  if (!token) return res.sendStatus(401);
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403);
+    req.user = user; // Add the decoded user information to the request object
+    next();
+  });
+};
 
 // Email transport (Nodemailer)
 const transporter = nodemailer.createTransport({
@@ -89,7 +98,7 @@ app.get("/verify-email", async (req, res) => {
   res.send("Email verified! You can now login.");
 });
 
-// User Login
+// User Login with JWT
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
   const user = await User.findOne({ username });
@@ -99,25 +108,25 @@ app.post("/login", async (req, res) => {
 
   const match = await bcrypt.compare(password, user.password);
   if (match) {
-    req.session.userId = user._id;
-    res.redirect("/quiz.html");
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET, {
+      expiresIn: "1h",
+    });
+    res.json({ token }); // Send JWT to the client
   } else {
     res.status(400).send("Invalid credentials");
   }
 });
 
-// Fetch Quizzes
-app.get("/api/quizzes", async (req, res) => {
+// Protected route: Fetch Quizzes
+app.get("/api/quizzes", authenticateToken, async (req, res) => {
   const quizzes = await Quiz.find();
   res.json(quizzes);
 });
 
-// Submit Quiz Result
-app.post("/submit-result", async (req, res) => {
-  const { userId } = req.session;
+// Protected route: Submit Quiz Result
+app.post("/submit-result", authenticateToken, async (req, res) => {
   const { quizId, score } = req.body;
-
-  if (!userId) return res.status(401).send("Unauthorized");
+  const userId = req.user.userId;
 
   const quiz = await Quiz.findById(quizId);
   const earned = quiz.reward * (score / 100);
@@ -129,7 +138,7 @@ app.post("/submit-result", async (req, res) => {
   res.send("Result submitted");
 });
 
-// Fetch Leaderboard
+// Fetch Leaderboard (No auth required, public route)
 app.get("/api/leaderboard", async (req, res) => {
   const leaderboard = await User.find({ earnings: { $gt: 0 } })
     .sort({ earnings: -1 })

@@ -13,6 +13,7 @@
     <button id="next-question">Next Question</button>
 
     <script>
+      const token = localStorage.getItem("token"); // Retrieve JWT
       let currentQuestionIndex = 0;
       let quizData = [];
       let score = 0;
@@ -67,18 +68,26 @@
       function submitResult() {
         fetch("/submit-result", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: token, // Include JWT in request headers
+          },
           body: JSON.stringify({ quizId: quizData._id, score }),
         }).then(() => {
           alert("Result submitted!");
         });
       }
 
-      fetch("/api/quizzes")
+      fetch("/api/quizzes", {
+        headers: { Authorization: token }, // Include JWT in request headers
+      })
         .then((res) => res.json())
         .then((data) => {
           quizData = data[0].questions; // Load first quiz for now
           loadNextQuestion();
+        })
+        .catch((err) => {
+          alert("Error fetching quiz data: " + err);
         });
 
       nextButton.addEventListener("click", loadNextQuestion);
